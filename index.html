@@ -3,7 +3,11 @@
 <head>
   <meta charset="utf-8">
   <title>Minecraft Party AR - Shared World</title>
-  <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+  
+  <!-- A-Frame (stable version that works well with AR.js) -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  
+  <!-- AR.js (latest stable build) -->
   <script src="https://cdn.jsdelivr.net/gh/jeromeetienne/AR.js@2.2.2/aframe/build/aframe-ar.js"></script>
 
   <!-- Firebase Compat SDK -->
@@ -21,14 +25,13 @@
       messagingSenderId: "794136755217",
       appId: "1:794136755217:web:61e065f7493456ca63c5b0"
     };
-    
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
   </script>
 
   <script>
-    // Shared position component for real-time sync
+    // Shared position component
     AFRAME.registerComponent('shared-position', {
       schema: { path: {type: 'string', default: 'party/mobs'} },
       init: function () {
@@ -54,21 +57,21 @@
   </style>
 </head>
 <body>
-  <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+  <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false; patternRatio: 0.5;">
 
-    <!-- Your custom marker (change to your own .patt file) -->
+    <!-- Your custom marker -->
     <a-marker preset="custom" type="pattern" url="party-marker.patt">
 
-      <!-- Shared Creeper that syncs across all devices -->
+      <!-- Shared Creeper -->
       <a-entity 
-        gltf-model="https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/Duck/glTF/Duck.gltf" 
+        gltf-model="https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/Duck/glTF/Duck.gltf"
         scale="0.15 0.15 0.15" 
         position="0 0.3 0"
         shared-position="path: party/mobs/creeper1"
         animation="property: position; to: 0 0.45 0; loop: true; dur: 2000; easing: easeInOutSine">
       </a-entity>
 
-      <!-- Invisible cake for basic occlusion -->
+      <!-- Invisible cake occlusion -->
       <a-entity 
         geometry="primitive: box; width: 0.35; height: 0.25; depth: 0.35" 
         material="visible: false; depthWrite: true" 
