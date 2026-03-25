@@ -66,18 +66,18 @@
     vr-mode-ui="enabled: false"
     arjs="sourceType: webcam; debugUIEnabled: false;">
 
-    <!-- DIAGNOSTIC: red box always 5m ahead — confirmed visible -->
-    <a-box color="red" width="2" height="2" depth="2" position="0 1 -5"></a-box>
-
-    <!-- GPS test: attribute directly on the box, made huge so it can't be missed -->
-    <a-box id="gpsTest"
-      color="blue"
-      width="10" height="10" depth="10"
-      gps-entity-place="latitude: 51.4106854; longitude: -0.0766787">
-    </a-box>
+    <!-- Oak Tree -->
+    <a-entity id="gpsTest" gps-entity-place="latitude: 51.4106854; longitude: -0.0766787">
+      <!-- Trunk -->
+      <a-box color="#5C3A1E" width="0.6" height="3"   depth="0.6" position="0 1.5 0"></a-box>
+      <!-- Leaves: stepped Minecraft canopy -->
+      <a-box color="#2D6A4F" width="3"   height="0.6" depth="3"   position="0 3.5 0"></a-box>
+      <a-box color="#2D6A4F" width="2.4" height="0.6" depth="2.4" position="0 4.1 0"></a-box>
+      <a-box color="#2D6A4F" width="1.2" height="0.6" depth="1.2" position="0 4.7 0"></a-box>
+    </a-entity>
 
     <!-- look-controls drives device orientation on mobile — must stay enabled -->
-    <a-camera gps-camera rotation-reader></a-camera>
+    <a-camera gps-camera="smoothingFactor: 0.5" rotation-reader></a-camera>
 
   </a-scene>
 
