@@ -32,7 +32,6 @@
   <style>
     body { margin: 0; overflow: hidden; }
 
-    /* Debug overlay — tap to hide */
     #debug {
       position: fixed;
       top: 8px;
@@ -45,6 +44,7 @@
       border-radius: 6px;
       z-index: 999;
       pointer-events: none;
+      line-height: 1.6;
     }
   </style>
 </head>
@@ -52,92 +52,70 @@
 
   <div id="debug">
     GPS: <span id="dbgGps">waiting...</span><br>
-    Heading: <span id="dbgHeading">--</span>
+    Accuracy: <span id="dbgAcc">--</span><br>
+    Heading: <span id="dbgHeading">--</span><br>
+    Tree dist: <span id="dbgDist">--</span>
   </div>
 
+  <!--
+    GPS-only scene for now — no <a-marker> as it conflicts with gps-camera init.
+    We will add the cake marker back once GPS is confirmed working.
+  -->
   <a-scene
     vr-mode-ui="enabled: false"
-    embedded
-    arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;">
+    arjs="sourceType: webcam; debugUIEnabled: false;">
 
-    <!-- ============================================================
-         OUTDOOR GPS WORLD
-         All sizes are in metres. 1 unit = 1 metre in GPS mode.
-         ============================================================ -->
-
-    <!-- Oak Tree -->
+    <!-- Oak Tree at pinned location -->
     <a-entity gps-entity-place="latitude: 51.4106854; longitude: -0.0766787">
 
-      <!-- Trunk: 0.6m wide, 3m tall, base at ground (y=0) -->
-      <a-box
-        color="#5C3A1E"
-        width="0.6" height="3" depth="0.6"
-        position="0 1.5 0">
-      </a-box>
+      <!-- Trunk: 0.6m wide, 3m tall -->
+      <a-box color="#5C3A1E" width="0.6" height="3" depth="0.6" position="0 1.5 0"></a-box>
 
-      <!-- Leaves — three layers, Minecraft stepped canopy -->
-      <!-- Bottom layer: widest -->
-      <a-box
-        color="#2D6A4F"
-        width="3" height="0.6" depth="3"
-        position="0 3.5 0">
-      </a-box>
-      <!-- Middle layer -->
-      <a-box
-        color="#2D6A4F"
-        width="2.4" height="0.6" depth="2.4"
-        position="0 4.1 0">
-      </a-box>
-      <!-- Top layer: narrowest -->
-      <a-box
-        color="#2D6A4F"
-        width="1.2" height="0.6" depth="1.2"
-        position="0 4.7 0">
-      </a-box>
+      <!-- Leaves — stepped Minecraft canopy -->
+      <a-box color="#2D6A4F" width="3"   height="0.6" depth="3"   position="0 3.5 0"></a-box>
+      <a-box color="#2D6A4F" width="2.4" height="0.6" depth="2.4" position="0 4.1 0"></a-box>
+      <a-box color="#2D6A4F" width="1.2" height="0.6" depth="1.2" position="0 4.7 0"></a-box>
 
     </a-entity>
 
-
-    <!-- ============================================================
-         INDOOR MARKER WORLD
-         Point camera at a Hiro marker (print from:
-         https://raw.githack.com/AR-js-org/AR.js/master/data/images/hiro.png)
-         We will build the Ghast cake scene here next.
-         ============================================================ -->
-
-    <a-marker preset="hiro">
-      <!-- Placeholder — Ghast cake coming soon -->
-      <a-text
-        value="Ghast\ncake\ncoming\nsoon!"
-        align="center"
-        color="#5dbb63"
-        position="0 0.5 0"
-        scale="0.5 0.5 0.5">
-      </a-text>
-    </a-marker>
-
-
-    <!-- Camera: gps-camera enables location-based AR -->
-    <a-camera gps-camera rotation-reader></a-camera>
+    <!-- look-controls disabled so gps-camera owns orientation -->
+    <a-camera gps-camera rotation-reader look-controls="enabled: false"></a-camera>
 
   </a-scene>
 
   <script>
-    // Update debug overlay with live GPS + heading
+    const TREE_LAT = 51.4106854;
+    const TREE_LON = -0.0766787;
+
+    function haversineM(lat1, lon1, lat2, lon2) {
+      const R = 6371000;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2)**2 +
+                Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
     if ('geolocation' in navigator) {
       navigator.geolocation.watchPosition((pos) => {
+        const { latitude, longitude, accuracy } = pos.coords;
         document.getElementById('dbgGps').textContent =
-          pos.coords.latitude.toFixed(5) + ', ' +
-          pos.coords.longitude.toFixed(5) +
-          ' (+/-' + Math.round(pos.coords.accuracy) + 'm)';
+          latitude.toFixed(5) + ', ' + longitude.toFixed(5);
+        document.getElementById('dbgAcc').textContent = '+/- ' + Math.round(accuracy) + 'm';
+        const dist = haversineM(latitude, longitude, TREE_LAT, TREE_LON);
+        document.getElementById('dbgDist').textContent = Math.round(dist) + 'm away';
       }, null, { enableHighAccuracy: true });
     }
 
+    // Heading — works on Android (absolute) and iOS (webkit)
     window.addEventListener('deviceorientationabsolute', (e) => {
-      if (e.alpha !== null) {
+      if (e.alpha !== null)
+        document.getElementById('dbgHeading').textContent = Math.round(e.alpha) + 'deg (abs)';
+    }, true);
+    window.addEventListener('deviceorientation', (e) => {
+      if (e.webkitCompassHeading !== undefined)
         document.getElementById('dbgHeading').textContent =
-          Math.round(e.alpha) + 'deg';
-      }
+          Math.round(e.webkitCompassHeading) + 'deg (webkit)';
     }, true);
   </script>
 
