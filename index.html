@@ -54,7 +54,8 @@
     GPS: <span id="dbgGps">waiting...</span><br>
     Accuracy: <span id="dbgAcc">--</span><br>
     Heading: <span id="dbgHeading">--</span><br>
-    Tree dist: <span id="dbgDist">--</span>
+    Tree dist: <span id="dbgDist">--</span><br>
+    Entity pos: <span id="dbgEntityPos">--</span>
   </div>
 
   <!--
@@ -65,18 +66,15 @@
     vr-mode-ui="enabled: false"
     arjs="sourceType: webcam; debugUIEnabled: false;">
 
-    <!-- DIAGNOSTIC: plain red box, no GPS, always 5m ahead.
-         If this is visible, A-Frame rendering works fine.
-         If this is NOT visible, the scene itself isn't rendering. -->
+    <!-- DIAGNOSTIC: red box always 5m ahead — confirmed visible -->
     <a-box color="red" width="2" height="2" depth="2" position="0 1 -5"></a-box>
 
-    <!-- Oak Tree — gps-entity-place on the entity wrapper -->
-    <a-entity gps-entity-place="latitude: 51.4106854; longitude: -0.0766787">
-      <a-box color="#5C3A1E" width="0.6" height="3" depth="0.6" position="0 1.5 0"></a-box>
-      <a-box color="#2D6A4F" width="3"   height="0.6" depth="3"   position="0 3.5 0"></a-box>
-      <a-box color="#2D6A4F" width="2.4" height="0.6" depth="2.4" position="0 4.1 0"></a-box>
-      <a-box color="#2D6A4F" width="1.2" height="0.6" depth="1.2" position="0 4.7 0"></a-box>
-    </a-entity>
+    <!-- GPS test: attribute directly on the box, made huge so it can't be missed -->
+    <a-box id="gpsTest"
+      color="blue"
+      width="10" height="10" depth="10"
+      gps-entity-place="latitude: 51.4106854; longitude: -0.0766787">
+    </a-box>
 
     <!-- look-controls disabled so gps-camera owns orientation -->
     <a-camera gps-camera rotation-reader look-controls="enabled: false"></a-camera>
@@ -106,6 +104,16 @@
         document.getElementById('dbgDist').textContent = Math.round(dist) + 'm away';
       }, null, { enableHighAccuracy: true });
     }
+
+    // Show where AR.js has positioned the GPS entity in 3D space
+    setInterval(() => {
+      const el = document.getElementById('gpsTest');
+      if (el) {
+        const pos = el.object3D.position;
+        document.getElementById('dbgEntityPos').textContent =
+          `x:${pos.x.toFixed(0)} y:${pos.y.toFixed(0)} z:${pos.z.toFixed(0)}`;
+      }
+    }, 1000);
 
     // Heading — works on Android (absolute) and iOS (webkit)
     window.addEventListener('deviceorientationabsolute', (e) => {
