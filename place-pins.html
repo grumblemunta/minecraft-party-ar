@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Minecraft AR - Place Pins</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: monospace;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    h1 {
+      font-size: 1.1rem;
+      color: #5dbb63;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .subtitle {
+      font-size: 0.75rem;
+      color: #888;
+      margin-bottom: 20px;
+    }
+
+    .gps-status {
+      background: #0f3460;
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 16px;
+      font-size: 0.8rem;
+    }
+
+    .gps-status .label { color: #888; }
+    .gps-status .value { color: #5dbb63; font-weight: bold; }
+    .gps-status .accuracy { color: #f0a500; }
+    .gps-status .error { color: #e94560; }
+
+    .name-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      background: #0f3460;
+      border: 1px solid #333;
+      border-radius: 6px;
+      padding: 10px 12px;
+      color: #e0e0e0;
+      font-family: monospace;
+      font-size: 0.9rem;
+    }
+
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #5dbb63;
+    }
+
+    input[type="text"]::placeholder { color: #555; }
+
+    button {
+      background: #5dbb63;
+      color: #1a1a2e;
+      border: none;
+      border-radius: 6px;
+      padding: 10px 16px;
+      font-family: monospace;
+      font-size: 0.9rem;
+      font-weight: bold;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      white-space: nowrap;
+    }
+
+    button:active { background: #4aa850; }
+    button:disabled { background: #333; color: #666; cursor: not-allowed; }
+
+    .btn-drop {
+      width: 100%;
+      padding: 14px;
+      font-size: 1rem;
+      margin-bottom: 20px;
+    }
+
+    .pins-header {
+      font-size: 0.75rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .pin-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .pin-item {
+      background: #0f3460;
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: 0.8rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .pin-item .pin-name {
+      color: #5dbb63;
+      font-weight: bold;
+      margin-bottom: 2px;
+    }
+
+    .pin-item .pin-coords { color: #aaa; }
+    .pin-item .pin-acc { color: #f0a500; font-size: 0.7rem; }
+
+    .pin-delete {
+      background: #e94560;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 0.7rem;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .pin-delete:active { background: #c73652; }
+
+    .empty-state {
+      color: #555;
+      font-size: 0.8rem;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .export-section { margin-top: 8px; }
+
+    .export-box {
+      background: #0a0a1a;
+      border: 1px solid #333;
+      border-radius: 6px;
+      padding: 12px;
+      font-size: 0.72rem;
+      color: #aaa;
+      white-space: pre;
+      overflow-x: auto;
+      margin-bottom: 10px;
+      line-height: 1.6;
+    }
+
+    .btn-copy {
+      background: #e94560;
+      width: 100%;
+    }
+
+    .copied-msg {
+      text-align: center;
+      color: #5dbb63;
+      font-size: 0.8rem;
+      margin-top: 8px;
+      height: 1.2em;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Minecraft AR</h1>
+  <p class="subtitle">Walk to each spot and drop a pin</p>
+
+  <div class="gps-status" id="gpsStatus">
+    <div><span class="label">Status: </span><span class="value" id="statusText">Waiting for GPS...</span></div>
+    <div><span class="label">Lat: </span><span class="value" id="latText">--</span></div>
+    <div><span class="label">Lon: </span><span class="value" id="lonText">--</span></div>
+    <div><span class="label">Accuracy: </span><span class="accuracy" id="accText">--</span></div>
+  </div>
+
+  <div class="name-row">
+    <input type="text" id="pinName" placeholder="e.g. oak tree, creeper, portal" />
+  </div>
+
+  <button class="btn-drop" id="dropBtn" disabled onclick="dropPin()">Drop Pin Here</button>
+
+  <div class="pins-header">Dropped pins (<span id="pinCount">0</span>)</div>
+
+  <div class="pin-list" id="pinList">
+    <div class="empty-state">No pins yet — walk to a spot and drop one</div>
+  </div>
+
+  <div class="export-section" id="exportSection" style="display:none">
+    <div class="pins-header">Export (send this to Claude)</div>
+    <div class="export-box" id="exportBox"></div>
+    <button class="btn-copy" onclick="copyExport()">Copy to Clipboard</button>
+    <div class="copied-msg" id="copiedMsg"></div>
+  </div>
+
+  <script>
+    let currentPos = null;
+    let pins = JSON.parse(localStorage.getItem('mc-ar-pins') || '[]');
+
+    // Start watching GPS
+    if ('geolocation' in navigator) {
+      navigator.geolocation.watchPosition(
+        (pos) => {
+          currentPos = pos;
+          document.getElementById('statusText').textContent = 'Ready';
+          document.getElementById('latText').textContent = pos.coords.latitude.toFixed(7);
+          document.getElementById('lonText').textContent = pos.coords.longitude.toFixed(7);
+          document.getElementById('accText').textContent = `+/- ${Math.round(pos.coords.accuracy)}m`;
+          document.getElementById('dropBtn').disabled = false;
+        },
+        (err) => {
+          document.getElementById('statusText').textContent = 'GPS error: ' + err.message;
+          document.getElementById('statusText').className = 'error';
+        },
+        { enableHighAccuracy: true, maximumAge: 0 }
+      );
+    } else {
+      document.getElementById('statusText').textContent = 'GPS not supported';
+      document.getElementById('statusText').className = 'error';
+    }
+
+    function dropPin() {
+      if (!currentPos) return;
+
+      const nameInput = document.getElementById('pinName');
+      const name = nameInput.value.trim() || `pin-${pins.length + 1}`;
+
+      const pin = {
+        name,
+        lat: parseFloat(currentPos.coords.latitude.toFixed(7)),
+        lon: parseFloat(currentPos.coords.longitude.toFixed(7)),
+        accuracy: Math.round(currentPos.coords.accuracy)
+      };
+
+      pins.push(pin);
+      localStorage.setItem('mc-ar-pins', JSON.stringify(pins));
+      nameInput.value = '';
+      renderPins();
+    }
+
+    function deletePin(index) {
+      pins.splice(index, 1);
+      localStorage.setItem('mc-ar-pins', JSON.stringify(pins));
+      renderPins();
+    }
+
+    function renderPins() {
+      const list = document.getElementById('pinList');
+      const count = document.getElementById('pinCount');
+      const exportSection = document.getElementById('exportSection');
+
+      count.textContent = pins.length;
+
+      if (pins.length === 0) {
+        list.innerHTML = '<div class="empty-state">No pins yet — walk to a spot and drop one</div>';
+        exportSection.style.display = 'none';
+        return;
+      }
+
+      list.innerHTML = pins.map((p, i) => `
+        <div class="pin-item">
+          <div>
+            <div class="pin-name">${escHtml(p.name)}</div>
+            <div class="pin-coords">${p.lat}, ${p.lon}</div>
+            <div class="pin-acc">accuracy: +/- ${p.accuracy}m</div>
+          </div>
+          <button class="pin-delete" onclick="deletePin(${i})">X</button>
+        </div>
+      `).join('');
+
+      exportSection.style.display = 'block';
+      document.getElementById('exportBox').textContent = buildExport();
+    }
+
+    function buildExport() {
+      return JSON.stringify(pins, null, 2);
+    }
+
+    function copyExport() {
+      navigator.clipboard.writeText(buildExport()).then(() => {
+        const msg = document.getElementById('copiedMsg');
+        msg.textContent = 'Copied!';
+        setTimeout(() => msg.textContent = '', 2000);
+      });
+    }
+
+    function escHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // Render any pins saved from a previous session
+    renderPins();
+  </script>
+
+</body>
+</html>
