@@ -76,8 +76,8 @@
       gps-entity-place="latitude: 51.4106854; longitude: -0.0766787">
     </a-box>
 
-    <!-- look-controls disabled so gps-camera owns orientation -->
-    <a-camera gps-camera rotation-reader look-controls="enabled: false"></a-camera>
+    <!-- look-controls drives device orientation on mobile — must stay enabled -->
+    <a-camera gps-camera rotation-reader></a-camera>
 
   </a-scene>
 
