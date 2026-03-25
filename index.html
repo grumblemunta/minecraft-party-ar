@@ -5,16 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Minecraft Party AR</title>
 
-  <!-- A-Frame -->
+  <!-- A-Frame only — no AR.js. GPS positioning is done manually. -->
   <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-
-  <!-- AR.js 3.x — supports GPS + marker in the same scene -->
-  <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.5/aframe/build/aframe-ar.js"></script>
 
   <!-- Firebase Compat SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyDhT4qioVyzVQ-tzAfTQpA-1y58D80mbmM",
@@ -30,101 +26,203 @@
   </script>
 
   <style>
-    body { margin: 0; overflow: hidden; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { overflow: hidden; background: black; }
+
+    /* Rear camera feed sits behind everything */
+    #video {
+      position: fixed;
+      inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      z-index: 0;
+    }
+
+    /* A-Frame canvas must be transparent so video shows through */
+    .a-canvas {
+      background: transparent !important;
+    }
 
     #debug {
       position: fixed;
-      top: 8px;
-      left: 8px;
+      top: 8px; left: 8px;
       background: rgba(0,0,0,0.6);
       color: #5dbb63;
       font-family: monospace;
       font-size: 12px;
       padding: 8px 10px;
       border-radius: 6px;
-      z-index: 999;
+      z-index: 10;
+      line-height: 1.8;
       pointer-events: none;
-      line-height: 1.6;
+    }
+
+    /* iOS 13+ needs a tap to grant DeviceOrientation permission */
+    #permBtn {
+      display: none;
+      position: fixed;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      background: #5dbb63;
+      color: #1a1a2e;
+      border: none;
+      border-radius: 8px;
+      padding: 14px 32px;
+      font-family: monospace;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
 
+  <!-- Camera feed -->
+  <video id="video" autoplay playsinline muted></video>
+
+  <!-- Debug overlay -->
   <div id="debug">
     GPS: <span id="dbgGps">waiting...</span><br>
     Accuracy: <span id="dbgAcc">--</span><br>
     Heading: <span id="dbgHeading">--</span><br>
-    Tree dist: <span id="dbgDist">--</span><br>
-    Entity pos: <span id="dbgEntityPos">--</span>
+    Tree: <span id="dbgDist">--</span>
   </div>
 
+  <!-- iOS orientation permission button -->
+  <button id="permBtn" onclick="requestOrientation()">Enable AR orientation</button>
+
   <!--
-    GPS-only scene for now — no <a-marker> as it conflicts with gps-camera init.
-    We will add the cake marker back once GPS is confirmed working.
+    A-Frame scene: transparent background, no sky.
+    look-controls uses DeviceOrientationControls (compass-absolute) on mobile.
+    GPS entities are positioned by JavaScript — not by AR.js GPS components.
   -->
   <a-scene
     vr-mode-ui="enabled: false"
-    arjs="sourceType: webcam; debugUIEnabled: false;">
+    renderer="alpha: true; antialias: true"
+    background="transparent: true"
+    embedded>
+
+    <!-- GPS entities: positions set by JavaScript below -->
 
     <!-- Oak Tree -->
-    <a-entity id="gpsTest" gps-entity-place="latitude: 51.4106854; longitude: -0.0766787">
+    <a-entity id="oakTree">
       <!-- Trunk -->
       <a-box color="#5C3A1E" width="0.6" height="3"   depth="0.6" position="0 1.5 0"></a-box>
-      <!-- Leaves: stepped Minecraft canopy -->
+      <!-- Leaves — stepped Minecraft canopy -->
       <a-box color="#2D6A4F" width="3"   height="0.6" depth="3"   position="0 3.5 0"></a-box>
       <a-box color="#2D6A4F" width="2.4" height="0.6" depth="2.4" position="0 4.1 0"></a-box>
       <a-box color="#2D6A4F" width="1.2" height="0.6" depth="1.2" position="0 4.7 0"></a-box>
     </a-entity>
 
-    <!-- look-controls drives device orientation on mobile — must stay enabled -->
-    <a-camera gps-camera="smoothingFactor: 0.5" rotation-reader></a-camera>
+    <!--
+      Camera: look-controls reads DeviceOrientation events.
+      On mobile this maps compass heading to world-space Y rotation.
+      north = -Z, east = +X (same as the GPS-to-world calculation below).
+    -->
+    <a-camera look-controls="pointerLockEnabled: false"></a-camera>
 
   </a-scene>
 
   <script>
-    const TREE_LAT = 51.4106854;
-    const TREE_LON = -0.0766787;
+    // ─── GPS entity definitions ────────────────────────────────────────────
+    // Add more objects here once you collect their coordinates.
+    const GPS_ENTITIES = [
+      { id: 'oakTree', lat: 51.4106854, lon: -0.0766787 }
+    ];
+
+    // ─── Camera feed ──────────────────────────────────────────────────────
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } }
+    }).then(stream => {
+      document.getElementById('video').srcObject = stream;
+    }).catch(err => {
+      document.getElementById('dbgGps').textContent = 'Cam error: ' + err.message;
+    });
+
+    // ─── Make A-Frame canvas transparent ──────────────────────────────────
+    document.querySelector('a-scene').addEventListener('loaded', () => {
+      const scene = document.querySelector('a-scene');
+      scene.renderer.setClearAlpha(0);
+      scene.renderer.setClearColor(new THREE.Color(0x000000), 0);
+    });
+
+    // ─── GPS → A-Frame world space ─────────────────────────────────────────
+    // north = -Z, east = +X, 1 unit = 1 metre
+    function gpsToWorld(deviceLat, deviceLon, entityLat, entityLon) {
+      const R = 6371000;
+      const dLat = (entityLat - deviceLat) * Math.PI / 180;
+      const dLon = (entityLon - deviceLon) * Math.PI / 180;
+      return {
+        x: R * dLon * Math.cos(deviceLat * Math.PI / 180),
+        y: 0,
+        z: -R * dLat   // north = -Z
+      };
+    }
 
     function haversineM(lat1, lon1, lat2, lon2) {
       const R = 6371000;
       const dLat = (lat2 - lat1) * Math.PI / 180;
       const dLon = (lon2 - lon1) * Math.PI / 180;
       const a = Math.sin(dLat/2)**2 +
-                Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+                Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
       return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
-    if ('geolocation' in navigator) {
-      navigator.geolocation.watchPosition((pos) => {
-        const { latitude, longitude, accuracy } = pos.coords;
-        document.getElementById('dbgGps').textContent =
-          latitude.toFixed(5) + ', ' + longitude.toFixed(5);
-        document.getElementById('dbgAcc').textContent = '+/- ' + Math.round(accuracy) + 'm';
-        const dist = haversineM(latitude, longitude, TREE_LAT, TREE_LON);
-        document.getElementById('dbgDist').textContent = Math.round(dist) + 'm away';
-      }, null, { enableHighAccuracy: true });
-    }
+    // ─── GPS position watch ────────────────────────────────────────────────
+    navigator.geolocation.watchPosition(pos => {
+      const { latitude, longitude, accuracy } = pos.coords;
 
-    // Show where AR.js has positioned the GPS entity in 3D space
-    setInterval(() => {
-      const el = document.getElementById('gpsTest');
-      if (el) {
-        const pos = el.object3D.position;
-        document.getElementById('dbgEntityPos').textContent =
-          `x:${pos.x.toFixed(0)} y:${pos.y.toFixed(0)} z:${pos.z.toFixed(0)}`;
-      }
-    }, 1000);
+      document.getElementById('dbgGps').textContent =
+        latitude.toFixed(5) + ', ' + longitude.toFixed(5);
+      document.getElementById('dbgAcc').textContent = '+/-' + Math.round(accuracy) + 'm';
 
-    // Heading — works on Android (absolute) and iOS (webkit)
-    window.addEventListener('deviceorientationabsolute', (e) => {
+      // Update all GPS entity positions
+      GPS_ENTITIES.forEach(entity => {
+        const el = document.getElementById(entity.id);
+        if (!el) return;
+        const wp = gpsToWorld(latitude, longitude, entity.lat, entity.lon);
+        el.setAttribute('position', wp);
+
+        // Show distance in debug for first entity
+        if (entity.id === 'oakTree') {
+          const dist = haversineM(latitude, longitude, entity.lat, entity.lon);
+          document.getElementById('dbgDist').textContent =
+            Math.round(dist) + 'm  pos:' + wp.x.toFixed(0) + ',' + wp.z.toFixed(0);
+        }
+      });
+    }, err => {
+      document.getElementById('dbgGps').textContent = 'GPS error: ' + err.message;
+    }, { enableHighAccuracy: true });
+
+    // ─── Compass heading debug ─────────────────────────────────────────────
+    window.addEventListener('deviceorientationabsolute', e => {
       if (e.alpha !== null)
-        document.getElementById('dbgHeading').textContent = Math.round(e.alpha) + 'deg (abs)';
+        document.getElementById('dbgHeading').textContent =
+          Math.round(e.alpha) + 'deg (abs)';
     }, true);
-    window.addEventListener('deviceorientation', (e) => {
+
+    window.addEventListener('deviceorientation', e => {
       if (e.webkitCompassHeading !== undefined)
         document.getElementById('dbgHeading').textContent =
           Math.round(e.webkitCompassHeading) + 'deg (webkit)';
     }, true);
+
+    // ─── iOS 13+ DeviceOrientation permission ─────────────────────────────
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+      document.getElementById('permBtn').style.display = 'block';
+    }
+
+    function requestOrientation() {
+      DeviceOrientationEvent.requestPermission()
+        .then(state => {
+          if (state === 'granted')
+            document.getElementById('permBtn').style.display = 'none';
+        })
+        .catch(console.error);
+    }
   </script>
 
 </body>
